@@ -1,0 +1,1591 @@
+#
+# EQL rules (os=windows)
+# source: github.com/endgameinc/eqllib
+# changes:
+# - added sub-techniques
+#
+- id: EQL-5c310aff-d4a8-43fb-beed-b17dab1f1df0-A
+  name: Remote Terminal Sessions
+  description: An adversary may use Valid Accounts to log into a service specifically
+    designed to accept remote connections.
+  eql: |-
+    process where subtype.create and
+      exe in ("telnet.exe", "putty.exe")
+    | unique_count parent_exe, command_line
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    technique_id: T1021
+    technique_name: Remote Services
+  mode: ~
+- id: EQL-5c310aff-d4a8-43fb-beed-b17dab1f1df0-B
+  name: Remote Terminal Sessions
+  description: An adversary may use Valid Accounts to log into a service specifically
+    designed to accept remote connections.
+  eql: |-
+    process where subtype.create and
+      exe == "putty.exe"
+    | unique_count parent_exe, command_line
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    technique_id: T1021.004
+    technique_name: Remote Services - SSH
+  mode: ~
+- id: EQL-8e7c9bce-565b-4ee1-bb70-37dc61afc8d0
+  name: Mounting Windows Hidden Shares with net.exe
+  description: Identifies hidden Windows Admin Network shares
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      (command_line == "* use \\\\*\\*$*" or command_line == "* use \\\\*/*$*")
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    technique_id: T1021.002
+    technique_name: Windows Admin Shares
+  mode: ~
+- id: EQL-9b3dd402-891c-4c4d-a662-28947168ce61
+  name: Mounting Hidden Shares
+  description: Identifies enumeration of mounted shares with the built-in Windows
+    tool ``net.exe``.
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      (command_line == "* use" or command_line == "* use *") and
+
+      // since this command is looking for discovery only, we want to ignore mounting shares
+      command_line == "* \\\\*"
+    | unique parent_image_path, command_line, user
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    technique_id: T1021.002
+    technique_name: Windows Admin Shares
+  mode: ~
+- id: EQL-46ff4da0-2f55-4023-8de3-1709fbd33f1d
+  name: Remote Desktop Protocol Hijack
+  description: Identifies possible Remote Desktop Protocol session hijacking
+  eql: |-
+    process where subtype.create and
+      exe == "tscon.exe" and command_line == "* *"
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    technique_id: T1021.001
+    technique_name: Remote Desktop Protocol
+  mode: ~
+- id: EQL-3abf86e1-3ba3-4473-90ea-5fc37ff57d18
+  name: Incoming Remote PowerShell Sessions
+  description: Incoming lateral movement via Windows Remote Management (WinRM)
+  eql: |-
+    sequence with maxspan=2s
+      [network where subtype.incoming and destination_port in (5985, 5986)]
+      [process where subtype.create and
+        exe == "wsmprovhost.exe" and parent_exe == "svchost.exe"]
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    - Execution
+    technique_id: T1021.006
+    technique_name: Windows Remote Management
+  mode: ~
+- id: EQL-af99d7ec-b1c7-4648-9188-063ca27544ac
+  name: Modification of Logon Scripts from Registry
+  description: Windows allows logon scripts to be run whenever a specific user or
+    group of users log into a system.
+  eql: |-
+    registry where key == "*\\Environment\\UserInitMprLogonScript"
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    - Persistence
+    technique_id: T1037.001
+    technique_name: Boot or Logon Initialization Scripts - Logon Script (Windows)
+  mode: ~
+- id: EQL-ab7a6ef4-0983-4275-a4f1-5c6bd3c31c23
+  name: Audio Capture via PowerShell
+  description: Detect attacker collecting audio via PowerShell Cmdlet.
+  eql: |-
+    process where subtype.create and
+      exe == "powershell.exe" and command_line == "* WindowsAudioDevice-Powershell-Cmdlet *"
+  attack_info:
+  - tactics:
+    - Collection
+    technique_id: T1123
+    technique_name: Audio Capture
+  mode: ~
+- id: EQL-15d87029-42c1-4992-a49b-aac74d451c06
+  name: Access of Outlook Email Archives
+  description: Collection of sensitive information via .ost and .pst outlook archive
+    files.
+  eql: |-
+    process where subtype.create and wildcard(command_line, "*.ost *", "*.pst *")
+  attack_info:
+  - tactics:
+    - Collection
+    technique_id: T1114.001
+    technique_name: Email Collection - Local Email Collection
+  mode: ~
+- id: EQL-7c7f3114-7bdd-4477-a4e0-b5105b6babd8
+  name: WMI Execution with Command Line Redirection
+  description: Identifies command execution via WMI with redirected output. WMI provides
+    a method to execute a process on a local or remote host, but does not expose a
+    way to read any console output. To get around this restriction, some administrators
+    or attackers will execute ``cmd.exe`` with output redirection to a file. Then
+    the file can be retrieved to read program output.
+  eql: |-
+    sequence by process_guid with maxspan=5s
+      [process where subtype.create and exe == "cmd.exe" and command_line == "*>*" and
+        descendant of [process where exe == "wmiprvse.exe"]]
+      [file where subtype.create and wildcard(file_name, "*.txt", "*.log")]
+  attack_info:
+  - tactics:
+    - Collection
+    technique_id: T1074
+    technique_name: Data Staged
+  mode: ~
+- id: EQL-f72a98cb-7b3d-4100-99c3-a138b6e9ff6e
+  name: Audio Capture via SoundRecorder
+  description: Detect audio collection via SoundRecorder application.
+  eql: |-
+    process where subtype.create and
+      exe == "SoundRecorder.exe" and command_line == "* /FILE*"
+  attack_info:
+  - tactics:
+    - Collection
+    technique_id: T1123
+    technique_name: Audio Capture
+  mode: ~
+- id: EQL-9be90e44-c0f7-4fd2-9378-be00c25a02d7
+  name: Remote System Discovery Commands
+  description: Commands used to obtain information about the remote system.
+  eql: |-
+    process where subtype.create and (
+      exe == "nbtstat.exe" and wildcard(command_line, "* -n*", "* -s*") or
+      exe == "arp.exe" and command_line == "* -a*"
+    )
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1018
+    technique_name: Remote System Discovery
+  mode: ~
+- id: EQL-bc1944cd-97fc-4b9a-b068-46203b6bbcde
+  name: Enumeration of Local Shares
+  description: Identifies enumeration of local shares with the built-in Windows tool
+    ``net.exe``.
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      command_line == "* share*" and command_line != "* * *"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1135
+    technique_name: Network Share Discovery
+  mode: ~
+- id: EQL-3a78a9fb-3714-43fa-90ca-7cf85da5a710
+  name: Discovery of Network Environment via Built-in Tools
+  description: Built-in tools can be used to enumerate and discover network environment
+    on windows systems.
+  eql: |-
+    process where subtype.create and
+      exe in ("ipconfig.exe", "route.exe", "nbtstat.exe", "arp.exe")
+    | unique command_line
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1016
+    technique_name: System Network Configuration Discovery
+  mode: ~
+- id: EQL-35d27938-d13d-4bcd-9be7-3a69d208c63f
+  name: Discovery and Enumeration of System Information via Rundll32
+  description: Identifies initial system enumeration and discovery commands tied to
+    remote access tools that leverage ``rundll32.exe`.
+  eql: |-
+    sequence with maxspan=1h
+      [process where subtype.create and exe == "rundll32.exe"] by process_guid
+      [network where subtype.outgoing and exe == "rundll32.exe"] by process_guid
+      [process where subtype.create and parent_exe == "rundll32.exe"] by parent_process_guid
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1218.011
+    technique_name: System Binary Proxy Execution - Rundll32
+  mode: ~
+- id: EQL-fcdb99c2-ac3c-4bde-b664-4b336329bed2
+  name: Discovery of a Remote System's Time
+  description: 'Identifies use of various commands to query a remote system''s time.
+
+    This technique may be used before executing a scheduled task or to discover the
+    time zone of a target system
+
+    '
+  eql: |-
+    process where subtype.create and exe == "net.exe" and
+      command_line == "* time *" and command_line == "*\\\\*"
+    | unique parent_image_path, command_line
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1124
+    technique_name: System Time Discovery
+  mode: ~
+- id: EQL-555a76e1-d5fe-44b9-a6bc-d275c4c446cc
+  name: Process Discovery via Windows Tools
+  description: Attackers will enumerate running processes to gain further comprehension
+    of the environment.
+  eql: |-
+    process where subtype.create and (
+      exe == "tasklist.exe" and not matchLite(?".* [-/]svc", command_line) or
+      exe == "quser.exe" or
+      (exe == "powershell.exe" and command_line == "*Get-Process*")
+    )
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1057
+    technique_name: Process Discovery
+  mode: ~
+- id: EQL-56fdf859-b2a7-4009-88e0-69fec4c3deef-A
+  name: Account Discovery via Built-In Tools
+  description: Adversaries may use built-in applications to get a listing of local
+    system or domain accounts
+  eql: |-
+    process where subtype.create and
+      exe == "net.exe" and command_line == "* user*" and command_line != "* \\domain*"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1087.001
+    technique_name: Account Discovery - Local Account
+  mode: ~
+- id: EQL-56fdf859-b2a7-4009-88e0-69fec4c3deef-B
+  name: Account Discovery via Built-In Tools
+  description: Adversaries may use built-in applications to get a listing of local
+    system or domain accounts
+  eql: |-
+    process where subtype.create and 
+      exe == "net.exe" and command_line == "* user*" and command_line == "* \\domain*"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1087.002
+    technique_name: Account Discovery - Domain Account
+  mode: ~
+- id: EQL-56fdf859-b2a7-4009-88e0-69fec4c3deef-C
+  name: Permission Groups Discovery via Built-In Tools
+  description: Adversaries may use built-in applications to get a listing of local
+    system or domain accounts
+  eql: |-
+    process where subtype.create and
+      exe == "net.exe" and command_line == "*localgroup *"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1069.001
+    technique_name: Permission Groups Discovery - Local Groups
+  mode: ~
+- id: EQL-56fdf859-b2a7-4009-88e0-69fec4c3deef-D
+  name: Permission Groups Discovery via Built-In Tools
+  description: Adversaries may use built-in applications to get a listing of local
+    system or domain accounts
+  eql: |-
+    process where subtype.create and
+      exe == "net.exe" and command_line == "*group *"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1069.002
+    technique_name: Permission Groups Discovery - Domain Groups
+  mode: ~
+- id: EQL-bccb1c48-305c-4b1f-affb-a7a50bf4654b
+  name: Domain Trust Discovery
+  description: Detect commands used to enumerate a list of trusted domains.
+  eql: |-
+    process where subtype.create and (
+      (exe == "dsquery.exe") and command_line == "*(objectClass=trustedDomain)*" or
+      (exe == "nltest.exe") and command_line == "*domain_trusts*"
+    )
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1482
+    technique_name: Domain Trust Discovery
+  mode: ~
+- id: EQL-507f19c1-dfa9-475b-925e-61e417a10967
+  name: Enumeration of System Information
+  description: Windows contains several built-in commands to report system information.
+    These may be used by an actor to gain detailed information about the target machine.
+  eql: |-
+    process where subtype.create and (
+      exe in ("systeminfo.exe", "hostname.exe") or
+      exe == "cmd.exe" and wildcard(command_line, "* ver*", "*%COMPUTERNAME%*", "*%PROCESSOR_*%")
+    )
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1082
+    technique_name: System Information Discovery
+  mode: ~
+- id: EQL-4d2e7fc1-af0b-4915-89aa-03d25ba7805e
+  name: Enumeration of Mounted Shares
+  description: Identifies enumeration of mounted shares with the built-in Windows
+    tool ``net.exe``.
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      (command_line == "* use" or command_line == "* use *") and
+
+      // since this command is looking for discovery only, we want to ignore mounting shares
+      command_line != "* \\\\*"
+    | unique parent_image_path, command_line, user
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1049
+    technique_name: System Network Connections Discovery
+  mode: ~
+- id: EQL-4b9c2df7-87e2-4bbc-9123-9779ecb2dbf2
+  name: System Information Discovery
+  description: Detect enumeration of Windows system information via ``systeminfo.exe``
+  eql: |-
+    process where subtype.create and exe == "systeminfo.exe"
+    | unique user, command_line
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1082
+    technique_name: System Information Discovery
+  mode: ~
+- id: EQL-4f64ef9e-ee9b-4245-a3f4-777e550ebb37
+  name: Network Service Scanning via Port
+  description: Network Service Scanning via incoming network port scanning
+  eql: |-
+    network where subtype.incoming
+    | unique process_guid destination_port
+    | unique_count process_guid
+    | filter count > 25
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1046
+    technique_name: Network Service Scanning
+  mode: ~
+- id: EQL-03e231a6-74bc-467a-acb1-e5676b0fb55e
+  name: Domain Trust Discovery via Nltest.exe
+  description: Identifies execution of nltest.exe for domain trust discovery. This
+    technique is used by attackers to enumerate Active Directory trusts.
+  eql: |-
+    process where subtype.create and
+      exe == "nltest.exe" and command_line == "*domain_trusts*"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1482
+    technique_name: Domain Trust Discovery
+  mode: ~
+- id: EQL-e61f557c-a9d0-4c25-ab5b-bbc46bb24deb
+  name: Enumeration of Remote Shares
+  description: Identifies enumeration of remote shares with the built-in Windows tool
+    ``net.exe``.
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      command_line == "* view*" and command_line == "*\\\\*"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1135
+    technique_name: Network Share Discovery
+  mode: ~
+- id: EQL-b8a94d2f-dc75-4630-9d73-1edc6bd26fff
+  name: Windows Network Enumeration
+  description: Identifies attempts to enumerate hosts in a network using the built-in
+    Windows ``net.exe`` tool.
+  eql: |-
+    process where subtype.create and
+        exe == "net.exe" and command_line == "* view*" and command_line != "*\\\\*"
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1018
+    technique_name: Remote System Discovery
+  mode: ~
+- id: EQL-4d8563cb-f6cb-4758-9255-92479260031f
+  name: System Owner and User Discovery
+  description: Windows contains several built-in commands to report the active user.
+    These may be used by an actor to learn privileges levels or determine if a session
+    is active.
+  eql: |-
+    process where subtype.create and (
+      exe in ("hostname.exe", "whoami.exe", "systeminfo.exe", "quser.exe") or
+      exe == "cmd.exe" and wildcard(command_line, "*echo *%USERNAME%*", "*echo *%USERDOMAIN%*")
+    )
+  attack_info:
+  - tactics:
+    - Discovery
+    technique_id: T1033
+    technique_name: System Owner/User Discovery
+  mode: ~
+- id: EQL-d49fc9fe-df80-416d-a861-0be02bef0df5
+  name: Mshta Descendant of Microsoft Office
+  description: Identifies the execution of ``mshta.exe`` as a descendant of a Microsoft
+    Office process.
+  eql: |-
+    process where subtype.create and exe == "mshta.exe"
+      and descendant of
+        [process where exe in ("outlook.exe", "winword.exe", "excel.exe", "powerpnt.exe")]
+  attack_info:
+  - tactics:
+    - Execution
+    - Defense Evasion
+    - Command and Control
+    technique_id: T1218.005
+    technique_name: Mshta
+  mode: ~
+- id: EQL-07b1481c-2a20-4274-a64e-effcd40941a5
+  name: Remote Execution via WMIC
+  description: Identifies use of ``wmic.exe`` to run commands on remote hosts.
+  eql: |-
+    process where subtype.create and exe == "wmic.exe" and
+      (command_line == "* /node:*" or command_line == "* -node:*") and
+      (command_line == "* *process* call *")
+  attack_info:
+  - tactics:
+    - Lateral Movement
+    - Execution
+    technique_id: T1047
+    technique_name: Windows Management Instrumentation
+  mode: ~
+- id: EQL-6bc283c4-21f2-4aed-a05c-a9a3ffa95dd4
+  name: Mshta Network Connections
+  description: Identifies suspicious ``mshta.exe`` commands that make outbound network
+    connections.
+  eql: |-
+    sequence by process_guid
+      [process where subtype.create and exe == "mshta.exe" and command_line == "*javascript*"]
+      [network where exe == "mshta.exe"]
+  attack_info:
+  - tactics:
+    - Execution
+    - Defense Evasion
+    - Command and Control
+    technique_id: T1218.005
+    technique_name: Mshta
+  mode: ~
+- id: EQL-2b512bec-b28d-4a84-9253-2c691bedb7bc
+  name: Executable Written and Executed by Microsoft Office Applications
+  description: Identifies an executable file written by a Microsoft Office application
+    where that same executable is later ran as it's own process. This behavior can
+    be indicative of suspicious activity possibly tied to macro objects or technologies
+    used for command execution such as Dynamic Data Exchange (DDE).
+  eql: |-
+    sequence with maxspan=3d
+      [file where file_name == "*.exe" and exe in ("winword.exe", "excel.exe", "powerpnt.exe")] by file_path
+      [process where true] by image_path
+  attack_info:
+  - tactics:
+    - Execution
+    technique_id: T1204.002
+    technique_name: User Execution - Malicious File
+  mode: ~
+- id: EQL-e6be5ffe-c765-4e13-962d-7eaae07aeaec
+  name: WMI Execution via Microsoft Office Application
+  description: Identifies the execution of Windows Management Instrumentation (WMI)
+    via a Microsoft Office application.
+  eql: |-
+    module where subtype.load and
+      exe in ("excel.exe", "winword.exe",
+                       "powerpnt.exe", "outlook.exe") and
+      module_name in ("wbemdisp.dll", "wbemcomn.dll", "wbemprox.dll",
+                     "wmiutils.dll", "wbemsvc.dll", "fastprox.dll")
+  attack_info:
+  - tactics:
+    - Execution
+    technique_id: T1047
+    technique_name: Windows Management Instrumentation
+  mode: ~
+- id: EQL-b937f762-466f-4242-a461-d68e6e4bfc5a
+  name: InstallUtil Execution
+  description: InstallUtil may be abused to bypass process whitelisting or proxy the
+    execution of code through a trusted Windows utility.
+  eql: |-
+    process where subtype.create and
+      exe == "installutil.exe" and
+      command_line == "* *"
+    | unique parent_exe, command_line
+  attack_info:
+  - tactics:
+    - Execution
+    - Defense Evasion
+    technique_id: T1218.004
+    technique_name: InstallUtil
+  mode: ~
+- id: EQL-45861478-8ba3-4302-9600-1970d5d8b074
+  name: Execution of Existing Service via Command
+  description: Identifies attempts to execute an existing service by running a built-in
+    Windows command.
+  eql: |-
+    process where subtype.create and (
+      exe == "sc.exe" and command_line == "* start *" or
+      exe == "net.exe" and match(command_line, ?".*? start *[\s].*") or
+      exe == "powershell.exe" and wildcard(command_line, "*Start-Service*") or
+      exe == "wmic.exe" and wildcard(command_line, "*service*call*startservice*")
+    )
+  attack_info:
+  - tactics:
+    - Execution
+    technique_id: T1569.002
+    technique_name: Service Execution
+  mode: ~
+- id: EQL-82200c71-f3c3-4b6c-aead-9cafeab602f5
+  name: RegSvr32 Scriptlet Execution
+  description: Detect regsvr32 loading a script object (scrobj).
+  eql: |-
+    process where subtype.create and
+      exe == "regsvr32.exe" and
+      wildcard(command_line, "*scrobj*", "*/i:*", "*-i:*", "*.sct*")
+  attack_info:
+  - tactics:
+    - Execution
+    technique_id: T1218.010
+    technique_name: Regsvr32
+  mode: ~
+- id: EQL-014c3f51-89c6-40f1-ac9c-5688f26090ab
+  name: User Account Creation
+  description: Identifies creation of local users via the ``net.exe`` command.
+  eql: |-
+    process where subtype.create and
+      (exe == "net.exe" or (exe == "net1.exe" and parent_exe != "net.exe")) and
+      command_line == "* user */ad*"
+  attack_info:
+  - tactics:
+    - Persistence
+    - Credential Access
+    technique_id: T1136.001
+    technique_name: Create Account - Local Account
+  mode: ~
+- id: EQL-d763c9bb-c0f7-4a4f-82b0-06105e178afa
+  name: Office Application Startup via Template File Modification
+  description: Adversaries can modify default Microsoft Office templates in order
+    to establish persistence
+  eql: |-
+    file where not subtype.delete and
+      wildcard(file_path,
+               "*:\\Users\\*\\AppData\\Roaming\\Microsoft\\Templates\\Normal.dotm",
+               "*:\\Users\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\PERSONAL.XLSB",
+               )
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1137.001
+    technique_name: Office Application Startup - Office Template Macros
+  mode: ~
+- id: EQL-43cfcfb8-e52d-4c1a-a110-3aecc09e6206
+  name: Installation of Security Support Provider
+  description: Adversaries can establish persistence by modifying registry keys related
+    to the Windows Security Support Provider (SSP) configuration
+  eql: |-
+    registry where
+       wildcard(key,
+                "*\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\Security Packages*",
+                "*\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\OSConfig\\Security Packages*")
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.005
+    technique_name: Security Support Provider
+  mode: ~
+- id: EQL-26f0ebab-b315-492d-a5be-aa665fba2f35
+  name: Change Default File Association
+  description: Detect changes to default File Association handlers.
+  eql: |-
+    sequence by process_guid with maxspan=1s
+      [ registry where key == "*\\SOFTWARE\\Classes\\*\\*"]
+      [ registry where key == "*\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\GlobalAssocChangedCounter"]
+    | unique_count exe, key
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1546.001
+    technique_name: Change Default File Association
+  mode: ~
+- id: EQL-822dc4c5-b355-4df8-bd37-29c458997b8f
+  name: Persistence via AppInit DLL
+  description: 'Detect registry modifications of the AppInit_Dlls key, which is used
+    by attackers to maintain persistence.
+
+    AppInit DLLs are loaded into every process that users the common library ``user32.dll``.
+
+    '
+  eql: |-
+    registry where wildcard(key,
+        "*\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_Dlls",
+        "*\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\AppInit_Dlls"
+      )
+      and not wildcard(image_path, "*\\system32\\msiexec.exe", "*\\syswow64\\msiexec.exe")
+    | unique value
+  attack_info:
+  - tactics:
+    - Persistence
+    - Privilege Escalation
+    technique_id: T1546.010
+    technique_name: AppInit DLLs
+  mode: ~
+- id: EQL-077b1d1b-34ff-42d2-bd48-b0e6cdd1a359
+  name: LSA Authentication Package
+  description: Adversaries can use the auto-start mechanism provided by LSA Authentication
+    Packages for persistence.
+  eql: |-
+    registry where
+      key == "HKLM\\*ControlSet*\\Control\\Lsa\\Authentication Packages*"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.002
+    technique_name: Authentication Package
+  mode: ~
+- id: EQL-5f9a71f4-f5ef-4d35-aff8-f67d63d3c896
+  name: Persistence via NetSh Key
+  description: "The tool NetShell allows for the creation of helper DLLs, which are\
+    \ loaded into ``netsh.exe`` every time it executes.\nThis is used by attackers\
+    \ to establish persistence.\n"
+  eql: |-
+    registry where key == "*\\Software\\Microsoft\\NetSh\\*"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1546.007
+    technique_name: Netsh Helper DLL
+  mode: ~
+- id: EQL-8e98bf09-e662-4908-b68e-5c96ad5c6860
+  name: Scheduled Task Creation via Microsoft Office Application
+  description: Identifies the creation of a scheduled task via a Microsoft Office
+    application to establish persistence.
+  eql: |-
+    module where subtype.load and
+      exe in ("excel.exe", "winword.exe", "powerpnt.exe", "outlook.exe") and
+      module_name == "taskschd.dll"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1053.005
+    technique_name: Scheduled Task/Job - Scheduled Task
+  mode: ~
+- id: EQL-c457d0c5-3ec8-4e9e-93f5-6ddcbfeec498
+  name: Registry Persistence via Run Keys
+  description: Adversaries can establish persistence by adding an entry to the "run
+    keys" in the registry or startup folder. The referenced program will be executed
+    when a user logs in.
+  eql: |-
+    registry where
+      key == "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run*"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.001
+    technique_name: Boot or Logon Autostart Execution - Registry Run Keys / Startup Folder
+  mode: ~
+- id: EQL-9d556fd6-76a3-45d5-9d8d-cb8edf0282f2
+  name: COM Hijack via Script Object
+  description: Identifies COM hijacking using the script object host ``scrobj.dll``,
+    which allows for stealthy execution of scripts in legitimate processes.
+  eql: |-
+    registry where
+      key == "*_Classes\\CLSID\\{*}\\InprocServer32*" and
+      (value == "scrobj*" or value == "*\\scrobj*")
+  attack_info:
+  - tactics:
+    - Persistence
+    - Defense Evasion
+    technique_id: T1546.015
+    technique_name: Component Object Model Hijacking
+  mode: ~
+- id: EQL-dd2eee76-9b44-479e-9860-435357e82db8
+  name: Persistence via Screensaver
+  description: Detect persistence via screensaver when attacker writes payload to
+    registry within screensaver key path.
+  eql: |-
+    registry where key == "*\\Control Panel\\Desktop\\SCRNSAVE.EXE"
+
+      // Ignore when the screensaver is legitimately set via the dialog
+      and not event of [ process where subtype.create
+                          and image_path == "*\\system32\\rundll32.exe"
+                          and parent_image_path == "*\\explorer.exe"
+                          and command_line == "* shell32.dll,Control_RunDLL desk.cpl,ScreenSaver,*"
+                        ]
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1546.002
+    technique_name: Screensaver
+  mode: ~
+- id: EQL-f8b1720c-7116-4ec3-b38a-402f984e4972
+  name: Registry Persistence via Shell Folders
+  description: Adversaries can establish persistence by adding an entry to the "run
+    keys" in the registry or startup folder. The referenced program will be executed
+    when a user logs in.
+  eql: |-
+    registry where
+      key == "\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\*Shell Folders*"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.001
+    technique_name: Registry Run Keys / Startup Folder
+  mode: ~
+- id: EQL-15c17f6b-29c5-43a4-8adc-d298f2c4c141
+  name: Service Path Modification with sc.exe
+  description: Identifies usage of the sc.exe command to modify existing services.
+  eql: |-
+    process where subtype.create and
+      exe == "sc.exe" and
+      wildcard(command_line, "* config *", "*binPath*")
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1543.003
+    technique_name: Modify Existing Service
+  mode: ~
+- id: EQL-46de6f8f-e30e-45f7-a136-7ab140c9af08
+  name: Registration of Winlogon Helper DLL
+  description: A winlogon registry key was modified to establish persistence.
+  eql: |-
+    registry where
+      wildcard(key,
+               "*\\Software[Wow6432Node]Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\*",
+               "*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\*")
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.004
+    technique_name: Winlogon Helper DLL
+  mode: ~
+- id: EQL-54fff7e8-f81d-4169-b820-4cbff0133e2d
+  name: Logon Scripts with UserInitMprLogonScript
+  description: Detect modification of Windows logon scripts stored in ``HKCU\Environment\UserInitMprLogonScript``
+    and trigger when a user logs in.
+  eql: |-
+    registry where key == "*\\Environment\\UserInitMprLogonScript"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1037.001
+    technique_name: Boot or Logon Initialization Scripts - Logon Script
+  mode: ~
+- id: EQL-7797d204-3205-4033-bac7-658fc203198d
+  name: Suspicious File Creation via Browser Extensions
+  description: Malicious browser extensions can be installed via app store downloads
+    masquerading as legitimate extensions, social engineering, or by an adversary
+    that has already compromised a system
+  eql: "file where not subtype.delete and\n  wildcard(file_name, \"*.exe\", \"*.dll\"\
+    , \"*.ps1\", \"*.vbs\", \"*.bat\") and  \n  wildcard(file_path,\n\t   // windows\n\
+    \t   \"*\\\\AppData\\\\Local\\\\Google\\\\Chrome\\\\User Data\\\\Default\\\\Extensions\"\
+    ,\n\t   \"*:\\\\Program Files\\\\Mozilla Firefox\\\\plugins\\\\*\",\n\t   \"*:\\\
+    \\Program Files\\\\Internet Explorer\\\\Plugins\\\\*\",\n\n\t   // macos\n\t \
+    \  \"/Applications/Firefox.app/Contents/MacOS/firefox/plugins/*\",\n\t   \"/Users/*/Library/Safari/Extensions/*\"\
+    ,\n\t   \"/Users/*/Library/Application Support/Google/Chrome/Default/Extensions/*\"\
+    \n\t   )"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1176
+    technique_name: Browser Extensions
+  mode: ~
+- id: EQL-279773ee-7c69-4043-870c-9ed731c7989a
+  name: Image Debuggers for Accessibility Features
+  description: 'The Debugger registry key allows an attacker to launch intercept the
+    execution of files, causing a different process to be executed. This functionality
+    is used by attackers and often targets common programs to establish persistence.
+
+    '
+  eql: |-
+    registry where wildcard(key,
+      "*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\*\\Debugger",
+      "*\\Software\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\*\\Debugger"
+      )
+
+      and wildcard(key,
+        // Accessibility Features
+        "*\\sethc.exe\\*",
+        "*\\utilman.exe\\*",
+        "*\\narrator.exe\\*",
+        "*\\osk.exe\\*",
+        "*\\magnify.exe\\*",
+        "*\\displayswitch.exe\\*",
+        "*\\atbroker.exe\\*",
+      )
+  attack_info:
+  - tactics:
+    - Persistence
+    - Privilege Escalation
+    - Defense Evasion
+    technique_id: T1546.008
+    technique_name: Accessibility Features
+  mode: ~
+- id: EQL-0e9a0a32-acf4-4969-9828-215a692c436e
+  name: Installing Custom Shim Databases
+  description: Identifies the installation of custom Application Compatibility Shim
+    databases.
+  eql: |-
+    registry where key == "*\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Custom\\*.sdb"
+      and not event of [process where subtype.create and
+
+                          // Ignore legitimate usage of sdbinst.exe
+                          not (exe == "sdbinst.exe" and parent_exe == "msiexec.exe")
+                       ]
+  attack_info:
+  - tactics:
+    - Persistence
+    - Privilege Escalation
+    technique_id: T1546.011
+    technique_name: Application Shimming
+  mode: ~
+- id: EQL-3056a14a-59d9-43d3-84b5-738b4b8c3dd7
+  name: Installation of Time Providers
+  description: Attackers may establish persistence by registering a DLL with Windows
+    as a valid time provider.
+  eql: |-
+    registry where
+      key == "*\\System\\CurrentControlSet\\Services\\W32Time\\TimeProviders\\*"
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1547.003
+    technique_name: Time Providers
+  mode: ~
+- id: EQL-100e0ff0-fae0-4dc0-998d-c168d7e4dcb7
+  name: Office Application Startup via Template Registry Modification
+  description: Adversaries can modify Microsoft Office-related registry keys to establish
+    persistence.
+  eql: |-
+    registry where wildcard(key,
+      "*\\Software\\Microsoft\\Office\\*\\Outlook\\Today\\UserDefinedUrl",
+      "*\\Software\\Microsoft\\Office\\*\\Excel\\Options\\Open",
+      "*\\Software\\Microsoft\\Office\\*\\PowerPoint\\AddIns",
+      "*\\Software\\Microsoft\\Office\\*\\Addins\\*",
+      "*\\SOFTWARE\\Microsoft\\Office\\*\\Excel\\Options",
+      "*\\Software\\Microsoft\\VBA\\VBE\\*\\Addins\\*")
+  attack_info:
+  - tactics:
+    - Persistence
+    technique_id: T1137.001
+    technique_name: Office Application Startup - Office Template Macros
+  mode: ~
+- id: EQL-1ec33c93-3d0b-4a28-8014-dbdaae5c60ae
+  name: Command-Line Creation of a RAR file
+  description: Detect compression of data into a RAR file using the ``rar.exe`` utility.
+  eql: |-
+    process where subtype.create and exe == "rar.exe" and
+      command_line == "* a *"
+  attack_info:
+  - tactics:
+    - Exfiltration
+    technique_id: T1560.001
+    technique_name: Data Compressed - Archive via Utility
+  mode: ~
+- id: EQL-ef9fe5c0-b16f-4384-bb61-95977799a84c
+  name: Suspicious Bitsadmin Job via bitsadmin.exe
+  description: Detect download of BITS jobs via bitsadmin.exe.
+  eql: |-
+    process where subtype.create
+      and exe == "bitsadmin.exe"
+      and wildcard(command_line, "* /download *", "*transfer*")
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Persistence
+    technique_id: T1197
+    technique_name: BITS Jobs
+  mode: ~
+- id: EQL-1261d02a-ee99-4954-8404-8376a8d441b2
+  name: Unload Sysmon Filter Driver with fltmc.exe
+  description: Detect the unloading of the Sysinternals Sysmon filter driver via the
+    ``unload`` command line parameter.
+  eql: |-
+    process where subtype.create and
+      exe == "fltmc.exe" and command_line == "* unload *sysmon*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1562.001
+    technique_name: Disabling Security Tools
+  mode: ~
+- id: EQL-a099cb16-1a92-4503-9102-56cc84a51ad1
+  name: Windows File Permissions Modification
+  description: File permissions are commonly managed by discretionary access control
+    lists (DACLs) specified by the file owner. Adversaries may modify file permissions/attributes
+    to evade intended DACLs.
+  eql: |-
+    process where subtype.create and (
+      exe == "attrib.exe" and command_line == "* +h*" or
+      exe == "takeown.exe" or
+      exe == "icacls.exe" and command_line == "*grant*"
+    )
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1222.001
+    technique_name: Windows File and Directory Permissions Modification
+  mode: ~
+- id: EQL-e584f1a1-c303-4885-8a66-21360c90995b
+  name: Bypass UAC via CMSTP
+  description: Detect child processes of automatically elevated instances of Microsoft
+    Connection Manager Profile Installer (``cmstp.exe``).
+  eql: |-
+    sequence
+      [ process where subtype.create and
+          exe == "cmstp.exe" and command_line =="*/s*" and command_line =="*/au*"] by process_guid
+      [ process where subtype.create ] by parent_process_guid
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1218.003
+    technique_name: Signed Binary Proxy Execution - CMSTP
+  mode: ~
+- id: EQL-a792cb37-fa56-43c2-9357-4b6a54b559c7
+  name: Suspicious Script Object Execution
+  description: Identifies scrobj.dll loaded into unusual Microsoft processes, often
+    indicating a *Squiblydoo* attack.
+  eql: |-
+    module where subtype.load and module_name == "scrobj.dll" and
+      exe in ("regsvr32.exe", "rundll32.exe", "certutil.exe")
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1218.010
+    technique_name: Signed Binary Proxy Execution - Regsvr32
+  mode: ~
+- id: EQL-7a2efea5-42d9-4bb1-8e53-6e6d47167a96
+  name: Root Certificate Install
+  description: Identifies modifications to the local trusted root certificates via
+    known Windows tools. The install of a malicious root certificate would allow an
+    attacker the ability to masquerade malicious files as valid signed components
+    from any entity (e.g. Microsoft). It could also allow an attacker to decrypt SSL
+    traffic on this machine. However, software may also install root certificates
+    for the purpose of inspecting SSL traffic.
+  eql: |-
+    registry where wildcard(key,
+                            "*Software\\Microsoft\\SystemCertificates\\Root\\Certificates\\*\\Blob",
+                            "*Software\\Microsoft\\SystemCertificates\\AuthRoot\\Certificates\\*\\Blob",
+                            "*Software\\Policies\\Microsoft\\SystemCertificates\\Root\\Certificates\\*\\Blob",
+                            "*Software\\Policies\\Microsoft\\SystemCertificates\\AuthRoot\\Certificates\\*\\Blob")
+    | unique image_path,key
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1553.004
+    technique_name: Subvert Trust Controls - Install Root Certificate
+  mode: ~
+- id: EQL-c91f422a-5214-4b17-8664-c5fcf115c0a2
+  name: Delete Volume USN Journal with fsutil
+  description: Identifies use of the fsutil command to delete the volume USNJRNL.
+    This technique is used by attackers to eliminate evidence of files created during
+    post-exploitation activities.
+  eql: |-
+    process where subtype.create and
+      exe == "fsutil.exe" and command_line == "* usn *" and command_line == "* deletejournal*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1070.004
+    technique_name: Indicator Removal on Host - File Deletion
+  mode: ~
+- id: EQL-0d62a884-1052-44d0-a76c-1f4845e348d2
+  name: Proxied Execution via Signed Scripts
+  description: Signed script scripts such as PubPrn.vbs can be used to proxy execution
+    from a remote site while bypassing signature validation restrictions and potentially
+    application whitelisting.
+  eql: |-
+    process where subtype.create and
+      exe in ("cscript.exe", "wscript.exe") and
+      command_line == "* *.vbs* *script:http*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1216.001
+    technique_name: Signed Script Proxy Execution - PubPrn
+  mode: ~
+- id: EQL-3b9bbf6b-dde2-4f82-b1ad-b3b625f44a26
+  name: Control Panel Items
+  description: Windows Control Panel items are utilities that allow users to view
+    and adjust computer settings. Adversaries can use Control Panel items as execution
+    payloads to execute arbitrary commands.
+  eql: |-
+    process where subtype.create and
+      exe in ("control.exe", "rundll32.exe") and
+      command_line == "*.cpl *"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1218.002
+    technique_name: Signed Binary Proxy Execution - Control Panel Items
+  mode: ~
+- id: EQL-339d4a19-dfb8-4d86-89c8-6a3ac807a57f-A
+  name: Host Artifact Deletion
+  description: Adversaries may delete artifacts on a host system, including logs,
+    browser history, or directories.
+  eql: |-
+    process where subtype.create and (
+      (exe == "rundll32.exe" and command_line == "*InetCpl.cpl,Clear*") or
+      (exe == "reg.exe" and command_line == "* delete *")
+    )
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1070
+    technique_name: Indicator Removal on Host
+  mode: ~
+- id: EQL-339d4a19-dfb8-4d86-89c8-6a3ac807a57f-B
+  name: Host Artifact Deletion
+  description: Adversaries may delete artifacts on a host system, including logs,
+    browser history, or directories.
+  eql: |-
+    process where subtype.create and
+      exe == "cmd.exe" and command_line == "* *rmdir *"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1070.004
+    technique_name: Indicator Removal on Host - File Deletion
+  mode: ~
+- id: EQL-3b1b9720-179b-47e2-930e-d3757bbe345e
+  name: Unusual Child Process
+  description: Identifies processes launched with suspicious parents.
+  eql: |-
+    process where subtype.create and
+    (
+      (exe == "smss.exe" and not parent_exe in ("System", "smss.exe")) or
+      (exe == "csrss.exe" and not parent_exe in ("smss.exe", "svchost.exe")) or
+      (exe == "wininit.exe" and parent_exe != "smss.exe") or
+      (exe == "winlogon.exe" and parent_exe != "smss.exe") or
+      (exe == "lsass.exe" and parent_exe != "wininit.exe") or
+      (exe == "LogonUI.exe" and not parent_exe in ("winlogon.exe", "wininit.exe")) or
+      (exe == "services.exe" and parent_exe != "wininit.exe") or
+      (exe == "svchost.exe" and parent_exe != "services.exe" and
+          // When a 32-bit DLL is loaded, the syswow64\svchost.exe service will be called
+          not (parent_image_path == "*\\system32\\svchost.exe" and image_path ==  "*\\syswow64\\svchost.exe")
+      ) or
+      (exe == "spoolsv.exe" and parent_exe != "services.exe") or
+      (exe == "taskhost.exe" and not parent_exe in ("services.exe", "svchost.exe")) or
+      (exe == "taskhostw.exe" and not parent_exe in ("services.exe", "svchost.exe")) or
+      (exe == "userinit.exe" and not parent_exe in ("dwm.exe", "winlogon.exe"))
+    )
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1055.012
+    technique_name: Process Hollowing
+  mode: ~
+- id: EQL-7d328c61-8f63-4411-9ae7-e5b502a80e7e
+  name: Disconnecting from Network Shares with net.exe
+  description: Identifies attempts to remove network shares with the Windows built-in
+    command net.exe
+  eql: |-
+    process where subtype.create and
+      exe == "net.exe" and command_line == "* /d*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1070.005
+    technique_name: Network Share Connection Removal
+  mode: ~
+- id: EQL-5b223758-07d6-4100-9e11-238cfdd0fe97
+  name: Clearing Windows Event Logs with wevtutil
+  description: Identifies attempts to clear Windows event logs with the command ``wevtutil``.
+  eql: |-
+    process where subtype.create and
+      exe == "wevtutil.exe" and command_line == "* cl *"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1070.001
+    technique_name: Indicator Removal on Host - Clear Windows Event Logs
+  mode: ~
+- id: EQL-b25aa548-7937-11e9-8f5c-d46d6d62a49e
+  name: HH.exe execution
+  description: Identifies usage of hh.exe executing recently modified .chm files.
+  eql: |-
+    sequence with maxspan=1d
+       [file where file_name == "*.chm"]
+       [process where subtype.create and exe == "hh.exe" and command_line == "* *.chm*"]
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1218.001
+    technique_name: Compiled HTML File
+  mode: ~
+- id: EQL-ec5180c9-721a-460f-bddc-27539a284273
+  name: Suspicious Bitsadmin Job via PowerShell
+  description: Detect download of BITS jobs via PowerShell.
+  eql: |-
+    process where subtype.create and
+      exe == "powershell.exe" and command_line == "*Start-BitsTransfer*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Persistence
+    technique_id: T1197
+    technique_name: BITS Jobs
+  mode: ~
+- id: EQL-9051814c-a142-4b1c-965b-76a09dace760
+  name: Adding the Hidden File Attribute with via attrib.exe
+  description: Adversaries can add the *hidden* attribute to files to hide them from
+    the user in an attempt to evade detection
+  eql: |-
+    process where subtype.create and
+      exe == "attrib.exe" and
+      command_line == "* +h*"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Persistence
+    technique_id: T1564.001
+    technique_name: Hidden Files and Directories
+  mode: ~
+- id: EQL-884a7ccd-7305-4130-82d0-d4f90bc118b6
+  name: Indirect Command Execution
+  description: Detect indirect command execution via Program Compatibility Assistant
+    ``pcalua.exe`` or ``forfiles.exe``.
+  eql: |-
+    process where subtype.create and
+      parent_exe in ("pcalua.exe", "forfiles.exe")
+    | unique_count command_line, exe
+    | filter count < 10
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1202
+    technique_name: Indirect Command Execution
+  mode: ~
+- id: EQL-6624038b-05e6-4f9b-9830-346af38de870
+  name: Suspicious ADS File Creation
+  description: Detect suspicious creation or modification of NTFS Alternate Data Streams.
+  eql: |-
+    file where
+      file_name == "*:*" and file_name != "*:Zone.Identifier" and
+      (file_name == "*.dll*" or file_name == "*.exe*")
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1564.004
+    technique_name: NTFS File Attributes
+  mode: ~
+- id: EQL-56c64a8c-a787-488a-a7f2-b992d332679d
+  name: Execution via cmstp.exe
+  description: Identifies potentially stealthy execution via the Microsoft Connection
+    Manager Profile Installer.
+  eql: |-
+    process where subtype.create and
+      exe == "cmstp.exe" and
+      command_line == "* /s *"
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    - Execution
+    technique_id: T1218.003
+    technique_name: CMSTP
+  mode: ~
+- id: EQL-251c26ff-658b-42d1-a808-bafcd4b52284
+  name: Processes Running with Unusual Extensions
+  description: Processes should always be executing with PE extensions, such as ``.exe``,
+    so any execution from non-PE extensions, such as ``.gif`` are immediately suspicious.
+  eql: |-
+    process where subtype.create
+      and wildcard(exe,
+                   "*.pif" ,  "*.pdf",    "*.docx",   "*.doc",
+                   "*.xlsx",  "*.xls",    "*.pptx",   "*.ppt",
+                   "*.txt",   "*.rtf",    "*.gif",    "*.jpg",
+                   "*.png",   "*.bmp",    "*.vbs",    "*.vbe",
+                   "*.bat",   "*.js",     "*.cmd",
+                   "*.wsh",   "*.ps1",    "* ",
+                  )
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1036
+    technique_name: Masquerading
+  mode: ~
+- id: EQL-c6facc54-4894-4722-b873-062baaae851f
+  name: Encoding or Decoding Files via CertUtil
+  description: Find execution of the Windows tool certutil.exe to decode or encode
+    files.
+  eql: |-
+    process where subtype.create and
+      exe == "certutil.exe" and
+      (command_line == "*encode *" or command_line == "*decode *")
+  attack_info:
+  - tactics:
+    - Defense Evasion
+    technique_id: T1140
+    technique_name: Deobfuscate/Decode Files or Information
+  mode: ~
+- id: EQL-dce405ba-0f30-4278-b6c6-80d57847ba6b
+  name: Installation of Port Monitor
+  description: A port monitors can be registered by calling the ``AddMonitor`` API
+    with a path to a DLL. This functionality can be abused by attackers to establish
+    persistence.
+  eql: |-
+    registry where key == "*ControlSet*\\Control\\Print\\Monitors*"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    - Persistence
+    technique_id: T1547.010
+    technique_name: Boot or Logon Autostart Execution - Port Monitors
+  mode: ~
+- id: EQL-e491ce22-792f-11e9-8f5c-d46d6d62a49e
+  name: Bypass UAC via Fodhelper.exe
+  description: Identifies use of Fodhelper.exe to bypass User Account Control. Adversaries
+    use this technique to execute privileged processes.
+  eql: |-
+    process where subtype.create and
+      parent_exe == "fodhelper.exe"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1548.002
+    technique_name: Bypass User Account Control
+  mode: ~
+- id: EQL-532b5ed4-7930-11e9-8f5c-d46d6d62a49e
+  name: Bypass UAC via WSReset.exe
+  description: Identifies use of WSReset.exe to bypass User Account Control. Adversaries
+    use this technique to execute privileged processes.
+  eql: |-
+    process where subtype.create and
+      parent_exe == "wsreset.exe" and exe != "conhost.exe"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1548.002
+    technique_name: Bypass User Account Control
+  mode: ~
+- id: EQL-9583c2ff-508d-4ebb-8b89-712b0a4d3186
+  name: Creation of Scheduled Task with schtasks.exe
+  description: 'A scheduled task can be used by an adversary to establish persistence,
+    move laterally, and/or escalate privileges. '
+  eql: |-
+    process where subtype.create and
+      exe = "schtasks.exe" and
+      command_line = "*create*"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    - Execution
+    - Persistence
+    technique_id: T1053.005
+    technique_name: Scheduled Task/Job - Scheduled Task
+  mode: ~
+- id: EQL-f90dd84d-6aa1-4ffd-8f0e-933f51c20fbe
+  name: Registry Preparation of Event Viewer UAC Bypass
+  description: Identifies preparation for User Account Control (UAC) bypass via Event
+    Viewer registry hijacking.  Attackers bypass UAC to stealthily execute code with
+    elevated permissions.
+  eql: |-
+    registry where
+      key == "*\\MSCFile\\shell\\open\\command\\" and
+
+      // Ignore cases where the original avalue is restored
+      value != '*\\system32\\mmc.exe \"%1\"*'
+
+      // SYSTEM will never need to bypass uac
+      and not user_sid in ("S-1-5-18", "S-1-5-19", "S-1-5-20")
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1548.002
+    technique_name: Bypass User Account Control
+  mode: ~
+- id: EQL-7efc7afe-8396-4bf0-ac7d-1a860a401d22
+  name: Bypass UAC via CompMgmtLauncher
+  description: Identifies use of CompMgmtLauncher.exe to bypass User Account Control.
+    Adversaries use this technique to execute privileged processes.
+  eql: |-
+    sequence with maxspan=10s
+     [registry where key == "*\\mscfile\\shell\\open\\command*" and user != "NT AUTHORITY\\SYSTEM"]
+     [process where subtype.create and parent_image_path == "C:\\Windows\\System32\\CompMgmtLauncher.exe"]
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1548.002
+    technique_name: Bypass User Account Control
+  mode: ~
+- id: EQL-e491ce22-792f-11e9-8f5c-d46d6d62a49e
+  name: Bypass UAC via Eventvwr.exe
+  description: Identifies use of Eventvwr.exe to bypass User Account Control. Adversaries
+    use this technique to execute privileged processes.
+  eql: |-
+    process where subtype.create and
+      parent_exe == "eventvwr.exe" and exe != "mmc.exe"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1548.002
+    technique_name: Bypass User Account Control
+  mode: ~
+- id: EQL-14f90406-10a0-4d36-a672-31cabe149f2f
+  name: AppCert DLLs Registry Modification
+  description: Dynamic-link libraries (DLLs) that are specified in the AppCertDLLs
+    value in the Registry key can be abused to obtain persistence and privilege escalation
+    by causing a malicious DLL to be loaded and run in the context of separate processes
+    on the computer.
+  eql: |-
+    registry where key == "*\\System\\ControlSet*\\Control\\Session Manager\\AppCertDLLs\\*"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    - Persistence
+    technique_id: T1546.009
+    technique_name: AppCert DLLs
+  mode: ~
+- id: EQL-d8db43cf-ed52-4f5c-9fb3-c9a4b95a0b56
+  name: Interactive AT Job
+  description: Detect an interactive AT job, which may be used as a form of privilege
+    escalation.
+  eql: |-
+    process where subtype.create and
+      exe == "at.exe" and command_line == "* interactive *"
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1053.002
+    technique_name: Scheduled Task/Job - At (Windows)
+  mode: ~
+- id: EQL-afd1fba7-5301-4d5c-ae66-f8608bc98ae9
+  name: DLL Search Order Hijacking with known programs
+  description: Detects writing DLL files to known locations associated with Windows
+    files vulnerable to DLL search order hijacking.
+  eql: |-
+    file where not subtype.delete and
+      not uid in ("S-1-5-18", "S-1-5-19", "S-1-5-20") and (
+        file_path == "*\\windows\\ehome\\cryptbase.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\cryptbase.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\cryptsp.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\rpcrtremote.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\uxtheme.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\dwmapi.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\shcore.dll" or
+        file_path == "*\\windows\\system32\\sysprep\\oleacc.dll" or
+        file_path == "*\\windows\\system32\\ntwdblib.dll"
+      )
+    | unique image_path, file_path
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    - Defense Evasion
+    - Persistence
+    technique_id: T1574.001
+    technique_name: DLL Search Order Hijacking
+  mode: ~
+- id: EQL-dcb72010-c3f5-42bc-bc5e-f4f015aed1e8
+  name: Execution of a Command via a SYSTEM Service
+  description: Detect the usage of an intermediate service used to launch a SYSTEM-level
+    command via ``cmd.exe`` or ``powershell.exe``.
+  eql: |-
+    registry where
+        key == "*\\System\\*ControlSet*\\Services\\*\\ImagePath"
+        and wildcard(value, "*%COMSPEC%*", "*cmd.exe*", "*powershell*", "*cmd *")
+  attack_info:
+  - tactics:
+    - Privilege Escalation
+    technique_id: T1569.002
+    technique_name: Service Execution
+  mode: ~
+- id: EQL-679560ee-0ea0-4358-bf83-e4c478d9d1c8
+  name: Suspicious Process Loading Credential Vault DLL
+  description: Identifies an unexpected process loading the Windows Credential Vault
+    DLL in preparation of enumerating/stealing a user's saved credentials.
+  eql: |-
+    module where subtype.load and exe != "vaultcmd.exe" and
+      module_name == "vaultcli.dll"
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1555.004
+    technique_name: Credentials from Password Stores - Windows Credential Manager
+  mode: ~
+- id: EQL-1e1ef6be-12fc-11e9-8d76-4d6bb837cda4
+  name: LSASS Memory Dumping via ProcDump.exe
+  description: Identifies usage of Sysinternals ``procdump.exe`` to export the memory
+    space of lsass.exe which contains sensitive credentials.
+  eql: |-
+    process where subtype.create and
+      exe == "procdump*.exe" and command_line == "*lsass*"
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1003.001
+    technique_name: OS Credential Dumping - LSASS Memory
+  mode: ~
+- id: EQL-11968244-6db0-4e03-886c-e3983f9d9024
+  name: Credential Enumeration via Credential Vault CLI
+  description: Identifies use of the Credential Vault command line interface to enumerate
+    a user's saved credentials.
+  eql: |-
+    process where subtype.create and
+      exe == "vaultcmd.exe" and
+      command_line == "* /list*"
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1555.004
+    technique_name: Credentials from Password Stores - Windows Credential Manager
+  mode: ~
+- id: EQL-aed95fc6-5e3f-49dc-8b35-06508613f979
+  name: SAM Dumping via Reg.exe
+  description: Identifies usage of ``reg.exe`` to export registry hives which contain
+    the SAM and LSA secrets.
+  eql: |-
+    process where subtype.create and
+      exe == "reg.exe" and
+      (command_line == "* save *" or command_line == "* export *") and
+      (command_line == "*hklm*" or command_line == "*hkey_local_machine*" ) and
+      (command_line == "*\\sam *" or command_line == "*\\system *")
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1003.002
+    technique_name: OS Credential Dumping - Security Account Manager
+  mode: ~
+- id: EQL-aed95fc6-5e3f-49dc-8b35-06508613f979
+  name: LSA Dumping via Reg.exe
+  description: Identifies usage of ``reg.exe`` to export registry hives which contain
+    the SAM and LSA secrets.
+  eql: |-
+    process where subtype.create and
+      exe == "reg.exe" and
+      (command_line == "* save *" or command_line == "* export *") and
+      (command_line == "*hklm*" or command_line == "*hkey_local_machine*" ) and
+      (command_line == "*\\security *")
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1003.004
+    technique_name: OS Credential Dumping - LSA Secrets
+  mode: ~
+- id: EQL-19d59f40-12fc-11e9-8d76-4d6bb837cda4
+  name: AD Dumping via Ntdsutil.exe
+  description: Identifies usage of ``ntdsutil.exe`` to export an Active Directory
+    database to disk.
+  eql: |-
+    file where file_name == "ntds.dit" and exe == "ntdsutil.exe"
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1003.003
+    technique_name: OS Credential Dumping - NTDS
+  mode: ~
+- id: EQL-210b4ea4-12fc-11e9-8d76-4d6bb837cda4
+  name: LSASS Memory Dumping
+  description: Detect creation of dump files containing the memory space of lsass.exe,
+    which contains sensitive credentials.
+  eql: |-
+    file where file_name == "lsass*.dmp" and exe != "werfault.exe"
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1003.001
+    technique_name: OS Credential Dumping - LSASS Memory
+  mode: ~
+- id: EQL-ae6ae50f-69f3-4e85-bfe2-2db9d1422517
+  name: Registration of a Password Filter DLL
+  description: Identifies the installation of password filter DLLs which may be used
+    to steal credentials from LSA.
+  eql: |-
+    registry where
+      key == "HKLM\\*SYSTEM\\ControlSet*\\Control\\Lsa\\Notification Packages*"
+    | unique key, image_path
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1556.002
+    technique_name: Password Filter DLL
+  mode: ~
+- id: EQL-62b7273b-67b2-4698-95b5-f6fafabc3390
+  name: Searching for Passwords in Files
+  description: Adversaries may search local file systems and remote file shares for
+    files containing passwords.
+  eql: |-
+    process where subtype.create and
+      exe == "findstr.exe" and command_line == "*password*"
+    | unique parent_exe, command_line
+  attack_info:
+  - tactics:
+    - Credential Access
+    technique_id: T1552.001
+    technique_name: Credentials in Files
+  mode: ~
+- id: EQL-0b2ea078-b2ef-4cf7-aef1-564a63662e3b
+  name: Stopping Services with net.exe
+  description: Detects when running services are stopped with the net.exe command.
+  eql: |-
+    process where subtype.create and
+      exe == "net.exe" and
+      command_line == "* stop *"
+  attack_info:
+  - tactics:
+    - Impact
+    technique_id: T1489
+    technique_name: Service Stop
+  mode: ~
+- id: EQL-c4732632-9c1d-4980-9fa8-1d98c93f918e
+  name: Modification of Boot Configuration
+  description: Identifies use of the bcdedit command to delete boot configuration
+    data. This tactic is sometimes used as by malware or an attacker as a destructive
+    technique.
+  eql: |-
+    process where subtype.create and
+      exe == "bcdedit.exe" and command_line == "*set *" and
+      (command_line == "* bootstatuspolicy *ignoreallfailures*" or
+        command_line == "* recoveryenabled* no*")
+  attack_info:
+  - tactics:
+    - Impact
+    technique_id: T1490
+    technique_name: Inhibit System Recovery
+  mode: ~
+- id: EQL-d3a327b6-c517-43f2-8e97-1f06b7370705
+  name: Volume Shadow Copy Deletion via VssAdmin
+  description: Identifies suspicious use of vssadmin.exe to delete volume shadow copies.
+  eql: |-
+    process where subtype.create and exe == "vssadmin.exe" and
+      command_line == "*delete* *shadows*"
+  attack_info:
+  - tactics:
+    - Impact
+    technique_id: T1490
+    technique_name: Inhibit System Recovery
+  mode: ~
+- id: EQL-591da84a-0382-40e7-afc8-12bd58c40425
+  name: Service Stop or Disable with sc.exe
+  description: Detects when running services are stopped with the sc.exe command
+  eql: |-
+    process where subtype.create and exe == "sc.exe" and
+      wildcard(command_line, "* stop*", "* config *disabled*")
+  attack_info:
+  - tactics:
+    - Impact
+    technique_id: T1489
+    technique_name: Service Stop
+  mode: ~
+- id: EQL-7163f069-a756-4edc-a9f2-28546dcb04b0
+  name: Volume Shadow Copy Deletion via WMIC
+  description: Identifies use of wmic for shadow copy deletion on endpoints. This
+    commonly occurs in tandem with ransomware or other destructive attacks.
+  eql: |-
+    process where subtype.create and exe == "wmic.exe" and
+      command_line == "* *shadowcopy* *delete*"
+  attack_info:
+  - tactics:
+    - Impact
+    technique_id: T1490
+    technique_name: Inhibit System Recovery
+  mode: ~

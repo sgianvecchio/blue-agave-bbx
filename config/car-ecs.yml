@@ -1,0 +1,265 @@
+# CAR-to-ECS mappings
+
+# TYPE/FIELD MAPPINGS
+- {object: process, action: create}: {event.code: "1"}
+  command_line: process.command_line
+  current_working_directory: process.working_directory
+  exe: process.name
+  guid: process.entity_id
+  image_path: process.executable
+  integrity_level: winlog.event_data.IntegrityLevel
+  md5_hash: process.hash.md5
+  parent_command_line: process.parent.command_line
+  parent_exe: process.parent.name
+  parent_guid: process.parent.entity_id
+  parent_image_path: process.parent.executable
+  pid: process.pid
+  ppid: process.parent.pid
+  sha1_hash: process.hash.sha1
+  sha256_hash: process.hash.sha256
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  logon_guid: winlog.event_data.LogonGuid
+  logon_id: winlog.event_data.LogonId
+  parent_process_guid: process.parent.entity_id
+  process_guid: process.entity_id
+  terminal_session_id: winlog.event_data.TerminalSessionId
+- {object: file, action: timestomp}: {event.code: "2"}
+  creation_time: winlog.event_data.CreationUtcTime
+  extension: file.extension
+  file_name: file.name
+  file_path: file.path
+  image_path: process.executable
+  pid: process.pid
+  previous_creation_time: winlog.event_data.PreviousCreationUtcTime
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  creation_utc_time: winlog.event_data.CreationUtcTime
+  exe: process.name
+  previous_creation_utc_time: winlog.event_data.PreviousCreationUtcTime
+  process_guid: process.entity_id
+- {object: flow, action: start}: {event.code: "3"}
+  dest_fqdn: destination.domain
+  dest_hostname: destination.domain
+  dest_ip: destination.ip
+  dest_port: destination.port
+  exe: process.name
+  image_path: process.executable
+  pid: process.pid
+  src_fqdn: source.domain
+  src_hostname: source.domain
+  src_ip: source.ip
+  src_port: source.port
+  start_time: winlog.event_data.UtcTime
+  transport_protocol: network.transport
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  dest_ipv6: winlog.event_data.DestinationIsIpv6
+  initiated: network.direction
+  process_guid: process.entity_id
+  src_ipv6: network.type
+  transport: network.transport
+- {object: process, action: terminate}: {event.code: "5"}
+  exe: process.name
+  guid: process.entity_id
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  process_guid: process.entity_id
+- {object: driver, action: load}: {event.code: "6"}
+  module_name: file.name
+  signature_valid: file.code_signature.valid
+  signer: file.code_signature.subject_name
+  image_loaded: file.path
+  signature: file.code_signature.subject_name
+  signed: file.code_signature.signed
+- {object: module, action: load}: {event.code: "7"}
+  image_path: process.executable
+  module_name: file.name
+  module_path: file.path
+  pid: process.pid
+  signature_valid: file.code_signature.valid
+  signer: file.code_signature.subject_name
+  company: file.pe.company
+  exe: process.name
+  process_guid: process.entity_id
+  signature: file.code_signature.subject_name
+  signed: file.code_signature.signed
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+- {object: thread, action: create}: {event.code: "8"}
+  src_image: process.executable
+  src_pid: winlog.event_data.SourceProcessId
+  src_process_guid: process.entity_id
+  start_address: winlog.event_data.StartAddress
+  start_module: winlog.event_data.StartModule
+  start_module_name: winlog.event_data.StartModule
+  tgt_image: winlog.event_data.TargetImage
+  tgt_pid: winlog.event_data.TargetProcessId
+  tgt_process_guid: winlog.event_data.TargetProcessGuid
+  tgt_tid: winlog.event_data.NewThreadId
+- {object: file, action: read}: {event.code: "9"}
+  file_name: file.path
+  file_path: file.path
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  exe: process.name
+  process_guid: process.entity_id
+- {object: process, action: access}: {event.code: "10"}
+  call_trace: winlog.event_data.CallTrace
+  guid: process.entity_id
+  pid: winlog.event_data.TargetProcessId
+  target_guid: winlog.event_data.TargetProcessGUID
+  target_name: winlog.event_data.TargetImage
+  target_pid: winlog.event_data.TargetProcessId
+  user: winlog.event_data.SourceUser
+  granted_access: winlog.event_data.GrantedAccess
+  process_guid: winlog.event_data.TargetProcessGUID
+  src_exe: process.executable
+  src_image_path: process.executable
+  src_pid: winlog.event_data.SourceProcessId
+  src_process_guid: process.entity_id
+  tgt_exe: winlog.event_data.TargetImage
+  tgt_image_path: winlog.event_data.TargetImage
+  tgt_pid: winlog.event_data.TargetProcessId
+  tgt_process_guid: winlog.event_data.TargetProcessGUID
+- {object: file, action: create}: {event.code: "11"}
+  creation_time: winlog.event_data.CreationUtcTime
+  extension: file.extension
+  file_name: file.name
+  file_path: file.path
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  exe: process.name
+  process_guid: process.entity_id
+- {object: registry, action: add}: {event.code: "12"}
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  exe: process.name
+  process_guid: process.entity_id
+- {object: registry, action: remove}: {event.code: "12"}
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  exe: process.name
+  process_guid: process.entity_id
+- {object: registry, action: edit}: {event.code: "13"}
+  data: registry.data
+  exe: process.name
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  new_content: registry.data
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  process_guid: process.entity_id
+- {object: registry, action: value_edit}: {event.code: "13"}
+  data: registry.data
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  new_content: registry.data
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  exe: process.name
+  process_guid: process.entity_id
+- {object: registry, action: edit}: {event.code: "14"}
+  exe: process.name
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  new_content: winlog.event_data.NewName
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  process_guid: process.entity_id
+- {object: registry, action: key_edit}: {event.code: "14"}
+  hive: registry.hive
+  image_path: process.executable
+  key: registry.key
+  new_content: winlog.event_data.NewName
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  value: registry.value
+  exe: process.name
+  process_guid: process.entity_id
+- {object: file, action: create}: {event.code: "15"}
+  content: winlog.event_data.Contents
+  creation_time: winlog.event_data.CreationUtcTime
+  file_path: file.path
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  exe: process.name
+  process_guid: process.entity_id
+- {object: pipe, action: create}: {event.code: "17"}
+  exe: process.name
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  pipe_name: file.name
+  process_guid: process.entity_id
+- {object: pipe, action: connect}: {event.code: "18"}
+  exe: process.name
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  pipe_name: file.name
+  process_guid: process.entity_id
+- {object: dns, action: query}: {event.code: "22"}
+  exe: process.name
+  image_path: process.executable
+  pid: process.pid
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  process_guid: process.entity_id
+- {object: file, action: delete}: {event.code: "23"}
+  extension: file.extension
+  file_name: file.name
+  file_path: file.path
+  image_path: process.executable
+  md5_hash: process.hash.md5
+  pid: process.pid
+  sha1_hash: process.hash.sha1
+  sha256_hash: process.hash.sha256
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  exe: process.name
+  process_guid: process.entity_id
+- {object: file, action: delete}: {event.code: "26"}
+  extension: file.extension
+  file_name: file.name
+  file_path: file.path
+  image_path: process.executable
+  md5_hash: process.hash.md5
+  pid: process.pid
+  sha1_hash: process.hash.sha1
+  sha256_hash: process.hash.sha256
+  {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+  exe: process.name
+  process_guid: process.entity_id
+- {object: script_block, action: execution}: {winlog.event_id: "4104"}
+  pid: winlog.process.pid
+  script_block_id: powershell.file.script_block_id
+  script_block_text: powershell.file.script_block_text
+
+# FIELD MAPPINGS
+- exe: process.name
+- exe: process.pe.original_file_name
+- fqdn: host.name
+- hostname: host.hostname
+- image_path: process.executable
+- pid: process.pid
+- {user: '{domain}\{name}'}: {user.domain: '{domain}', user.name: '{name}'}
+- log_name: winlog.channel
+- process_guid: process.entity_id
+- record_number: winlog.record_id
+- time: "@timestamp"
+
+# LEGACY FIELD MAPPINGS
+- pipe_name: winlog.event_data.PipeName

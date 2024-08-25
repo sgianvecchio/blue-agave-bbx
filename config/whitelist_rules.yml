@@ -1,0 +1,51 @@
+- id: WHITELIST-0000
+  name: Event - Explorer
+  eql: process where subtype.create and exe == "explorer.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0001
+  name: Event - Services
+  eql: process where subtype.create and exe == "services.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0002
+  name: Event - Wininit
+  eql: process where subtype.create and exe == "wininit.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0003
+  name: Event - Userinit
+  eql: process where subtype.create and exe == "userinit.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0004
+  name: Event - Winlogon
+  eql: process where subtype.create and exe == "winlogon.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0005
+  name: Event - SMSS
+  eql: process where subtype.create and exe == "smss.exe"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0006
+  name: Event - Salt Python
+  eql: |
+    process where subtype.create and image_path == "c:\\salt\\bin\\python.exe" and
+      user == "NT AUTHORITY\\SYSTEM"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0007
+  name: Event - Salt SSM
+  eql: |
+    process where subtype.create and image_path == "c:\\salt\\bin\\ssm.exe" and
+      user == "NT AUTHORITY\\SYSTEM"
+  benign_info:
+  mode: whitelist
+- id: WHITELIST-0008
+  name: Event - Svchost
+  eql: |
+    process where subtype.create and image_path == "C:\\windows\\system32\\svchost.exe" and
+      user == "NT AUTHORITY\\SYSTEM"
+  benign_info:
+  mode: whitelist

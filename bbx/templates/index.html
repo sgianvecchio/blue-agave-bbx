@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900|Material+Icons" rel="stylesheet" type="text/css">
+    <link href="https://cdn.jsdelivr.net/npm/quasar@1.15.4/dist/quasar.min.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+    <div id="q-app">
+       <q-table
+        title="Activity Sets"
+        :data="data"
+        :columns="columns"
+        row-key="activity_set_id"
+        dense
+        id = "my-table"
+      >
+        <template v-slot:body-cell-rey="props">
+          <q-td :props="props">
+            <a :href="'{{bbate_host}}/#/?id='+props.row.activity_set_id" target="_blank">Rey</a>
+          </q-td>
+        </template>
+      </q-table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@^2.0.0/dist/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quasar@1.15.4/dist/quasar.umd.min.js"></script>
+
+    <script>
+      vue = new Vue({
+        el: "#q-app",
+        data: function () {
+          return {
+            columns: [
+              {
+                name: 'start',
+                label: 'Start',
+                field: 'start',
+                sortable: true
+              },
+              {
+                name: 'end',
+                label: 'End',
+                field: 'end',
+                sortable: true
+              },
+              {
+                name: 'hosts',
+                label: 'Host',
+                field: 'hosts',
+                sortable: true
+              },
+              {
+                name: 'techniques',
+                label: 'Techniques',
+                field: 'techniques',
+                sortable: true
+              },
+              {
+                name: 'tactics',
+                label: 'Tactics',
+                field: 'tactics',
+                sortable: true
+              },
+              {
+                name: 'alert_count',
+                label: 'Alerts',
+                field: 'alert_count',
+                sortable: true
+              },
+              {
+                name: 'event_count',
+                label: 'Events',
+                field: 'event_count',
+                sortable: true
+              },
+              {
+                name: 'activity_set_id',
+                label: 'ID',
+                field: 'activity_set_id',
+                sortable: true
+              },
+              {
+                name: 'rey',
+                label: 'Rey',
+                field: 'rey',
+                sortable: true
+              }
+            ],
+            data: []
+          }
+        },
+        methods: {},
+      });
+      function updateActivitySetTable() {
+        fetch('/abbrv_activity_sets')
+            .then(response => response.json())
+            .then(data => {
+              vue.$data.data = data
+            });
+      };
+      updateActivitySetTable();
+      setInterval(updateActivitySetTable, 1000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+elasticsearch
+elasticsearch_dsl
+eql
+flask
+flask_httpauth
+iteration_utilities
+networkx
+python-dateutil
+pyyaml
+stringcase

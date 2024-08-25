@@ -1,0 +1,14 @@
+# ECS config
+elastic:
+  hosts: [http://localhost:9200]
+  http_auth: [elastic, password]
+  index: [winlogbeat-*]
+translator:
+  mappings: ../config/car-ecs.yml
+  wildcard_suffix: .keyword
+detector:
+  # start: 2024-04-01T00:00:00.000Z
+  # end: 2024-04-02T00:00:00.000Z
+  interval: 10.0
+web:
+  port: 8089

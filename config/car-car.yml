@@ -1,0 +1,99 @@
+# CAR-to-CAR mappings
+
+# TYPE/FIELD MAPPINGS
+- {object: pipe, action: create}: {event_id: 17}
+- {object: pipe, action: connect}: {event_id: 18}
+- {object: dns, action: query}: {event_id: 22}
+- {object: file, action: delete}: {event_id: 23}
+- {object: file, action: delete}: {event_id: 26}
+- {object: script_block, action: execution}: {event_id: 4104}
+
+# FIELD MAPPINGS
+# CAR fields
+- object: data_model.object
+- action: data_model.action
+- base_address: data_model.fields.base_address
+- command_line: data_model.fields.command_line
+- company: data_model.fields.company
+- content: data_model.fields.content
+- creation_time: data_model.fields.creation_time
+- current_working_directory: data_model.fields.current_working_directory
+- data: data_model.fields.data
+- dest_fqdn: data_model.fields.dest_fqdn
+- dest_hostname: data_model.fields.dest_hostname
+- dest_ip: data_model.fields.dest_ip
+- dest_port: data_model.fields.dest_port
+- end_time: data_model.fields.end_time
+- env_vars: data_model.fields.env_vars
+- exe: data_model.fields.exe
+- exe: event_data.OriginalFileName
+- file_name: data_model.fields.file_name
+- file_path: data_model.fields.file_path
+- flags: data_model.fields.flags
+- fqdn: data_model.fields.fqdn
+- hive: data_model.fields.hive
+- hostname: data_model.fields.hostname
+- image_path: data_model.fields.image_path
+- integrity_level: data_model.fields.integrity_level
+- key: data_model.fields.key
+- logon_id: data_model.fields.logon_id
+- md5_hash: data_model.fields.md5_hash
+- module_name: data_model.fields.module_name
+- module_path: data_model.fields.module_path
+- name: data_model.fields.name
+- packet_count: data_model.fields.packet_count
+- parent_command_line: data_model.fields.parent_command_line
+- parent_exe: data_model.fields.parent_exe
+- parent_image_path: data_model.fields.parent_image_path
+- pid: data_model.fields.pid
+- pid: winlog.process.pid
+- pid: event_data.ProcessId
+- pid: process_id  # older games (e.g., CGX) use process_id
+- ppid: data_model.fields.ppid
+- previous_creation_time: data_model.fields.previous_creation_time
+- protocol: data_model.fields.protocol
+- proto_info: data_model.fields.proto_info
+- sha1_hash: data_model.fields.sha1_hash
+- sha256_hash: data_model.fields.sha256_hash
+- sid: data_model.fields.sid
+- signer: data_model.fields.signer
+- src_fqdn: data_model.fields.src_fqdn
+- src_hostname: data_model.fields.src_hostname
+- src_ip: data_model.fields.src_ip
+- src_pid: data_model.fields.src_pid
+- src_port: data_model.fields.src_port
+- src_tid: data_model.fields.src_tid
+- stack_base: data_model.fields.stack_base
+- stack_limit: data_model.fields.stack_limit
+- start_address: data_model.fields.start_address
+- start_function: data_model.fields.start_function
+- start_module: data_model.fields.start_module
+- start_module_name: data_model.fields.start_module_name
+- start_time: data_model.fields.start_time
+- subprocess_tag: data_model.fields.subprocess_tag
+- tgt_pid: data_model.fields.tgt_pid
+- tgt_tid: data_model.fields.tgt_tid
+- tid: data_model.fields.tid
+- type: data_model.fields.type
+- user: data_model.fields.user
+- user_stack_base: data_model.fields.user_stack_base
+- user_stack_limit: data_model.fields.user_stack_limit
+- value: data_model.fields.value
+# Sysmon fields
+- process_guid: data_model.fields.process_guid
+- process_guid: event_data.ProcessGuid
+- pipe_name: event_data.PipeName
+- parent_process_guid: data_model.fields.parent_process_guid
+- src_process_guid: data_model.fields.src_process_guid
+- tgt_process_guid: data_model.fields.tgt_process_guid
+- call_trace: data_model.fields.call_trace
+- granted_access: data_model.fields.granted_access
+- original_file_name: event_data.OriginalFileName
+# Windows Event fields
+- log_name: log_name
+- record_number: record_number
+- event_id: event_id
+- script_block_text: event_data.ScriptBlockText
+- script_block_id: event_data.ScriptBlockId
+# Other fields
+- time: win_event_timestamp
