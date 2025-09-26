@@ -4,7 +4,7 @@ eql
 flask
 flask_httpauth
 iteration_utilities
-networkx
+networkx==3.3
 python-dateutil
 pyyaml
 stringcase
