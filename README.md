@@ -4,7 +4,7 @@
 
 1. Download code
 ```
-git clone https://gitlab.mitre.org/BB-ATE/bbx.git
+git clone https://github.com/mitre/blue-agave-bbx.git
 ```
 
 2. (optional) Setup virtual environment
